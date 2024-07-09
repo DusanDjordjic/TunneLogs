@@ -11,7 +11,7 @@ Server then sends those messages to the frontend and we display them.
 
 ## How to run the app
 
-> **IMPORTANT**: App is not POC stage so you cannot reconnect. Each time you want to reload the frontend you will need to restart the app, same goes for cli :)
+> **IMPORTANT**: App is not ready yet so you cannot reconnect for example. Each time you want to reload the frontend you will need to restart the app, same goes for cli :)
 
 1. Run the server `make` which will start dev server using air or run `go run ./cmd/server.go` to start the server
 2. Go to *localhost:8080* to access logs page. You should see "Logs" title and a gray line
