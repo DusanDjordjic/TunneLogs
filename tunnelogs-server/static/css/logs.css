@@ -5,3 +5,7 @@
     border: 1px solid var(--color-secondary);
     border-radius: 4px;
 }
+
+.log {
+    color: var(--color-text-gray);
+}

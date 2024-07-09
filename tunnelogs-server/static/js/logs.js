@@ -1,4 +1,4 @@
-console.log("test");
+let logs = document.getElementById("logs");
 
 const socket = new WebSocket('ws://localhost:8080/connect/test/client');
 
@@ -10,6 +10,10 @@ socket.onopen = function(event) {
 // Event handler for incoming messages from the server
 socket.onmessage = function(event) {
     console.log('Received message from server:', event.data);
+    const newLog = document.createElement('div');
+    newLog.textContent = event.data;
+    newLog.classList.add("log");
+    logs.appendChild(newLog);
 };
 
 // Event handler for WebSocket errors

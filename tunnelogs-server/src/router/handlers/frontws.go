@@ -17,7 +17,7 @@ var upgrader = websocket.Upgrader{
 }
 
 var (
-	lobbies map[string]*Lobby
+	lobbies map[string]*Lobby = make(map[string]*Lobby)
 	lock    sync.Mutex
 )
 
@@ -53,7 +53,7 @@ func (lobby *Lobby) Start() {
 
 			lobby.client.Close()
 			lobby.producer.Close()
-			return
+			break
 		}
 
 		err = lobby.client.WriteMessage(messageType, message)
@@ -68,10 +68,13 @@ func (lobby *Lobby) Start() {
 
 			lobby.client.Close()
 			lobby.producer.Close()
-			return
+			break
 		}
-
 	}
+
+	lock.Lock()
+	defer lock.Unlock()
+	delete(lobbies, lobby.name)
 }
 
 func ClientWSHandler(c echo.Context) error {
@@ -147,7 +150,6 @@ func ServerWSHandler(c echo.Context) error {
 			producer: nil,
 			started:  false,
 		}
-
 		lobbies[lobbyName] = lobby
 	}
 
