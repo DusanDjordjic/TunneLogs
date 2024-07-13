@@ -11,6 +11,8 @@ Server then sends those messages to the frontend and we display them.
 
 ## How to run the app
 
+**OUTDATED**
+
 1. Run the server `make` which will start dev server using air or run `go run ./cmd/server.go` to start the server
 2. Go to *localhost:8080* to access logs page. You should see "Logs" title and a gray line
 3. Build the cli by running `cargo build`
