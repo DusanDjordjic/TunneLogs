@@ -1,0 +1,19 @@
+{{ define "imports"}}
+<link rel="stylesheet" href="/static/css/home.css">
+{{ end }}
+
+{{ define "content" }}
+<div class="container">
+    <h1 class="title">Select a Lobby</h1>
+    <form>
+        <div class="input-control">
+            <input type="text" id="lobby-input" />
+            <button type="sumbit" id="sumbit-button">Connect</button>
+        </div>
+    </form>
+    <div class="lobby-wrapper"></div>
+</div>
+{{ end }}
+{{ define "scripts" }}
+<script module src="/static/js/home.js"></script>
+{{ end }}

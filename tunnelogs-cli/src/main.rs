@@ -1,11 +1,22 @@
+use clap::Arg;
 use std::io::BufRead;
 use std::sync::mpsc;
 use std::thread;
 use websocket::{ClientBuilder, OwnedMessage};
 
 fn main() {
+    let matches = clap::Command::new("tunnelogs")
+        .version("0.1")
+        .about("Tunnel logs sends logs to server to specific lobby")
+        .arg(Arg::new("lobby").required(true))
+        .get_matches();
+
+    let lobby_name = matches
+        .get_one::<String>("lobby")
+        .expect("lobby is required");
+
     let (stdin_sender, stdin_receiver) = mpsc::channel();
-    let url = "ws://localhost:8080/connect/test/server";
+    let url = format!("ws://localhost:8080/connect/{}/server", lobby_name);
     let (close_sender, close_receiver) = mpsc::channel::<()>();
 
     thread::spawn(move || {
@@ -23,7 +34,7 @@ fn main() {
     });
 
     thread::spawn(move || {
-        let client = match ClientBuilder::new(url).unwrap().connect_insecure() {
+        let client = match ClientBuilder::new(&url).unwrap().connect_insecure() {
             Ok(client) => client,
             Err(err) => {
                 println!("failed to connect to ws server {err}");

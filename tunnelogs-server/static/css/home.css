@@ -1,0 +1,36 @@
+
+.input-control {
+    display: flex;
+    gap: 1rem;
+}
+
+.input-control input {
+    display: block;
+    width: 100%;
+    padding: 1rem;
+    font-size: 24px;
+    background-color: rgba(255, 255, 255, 0.05);
+    color: #fff;
+    border: none;
+    border-bottom: 4px solid #fff;
+    transition: all 0.3s;
+}
+
+.input-control input:focus  {
+    border-color: #9bd1e5;
+    outline: none;
+}
+
+.input-control button {
+    display: block;
+    width: 100px;
+    background-color: #9bd1e5;
+    font-size: 18px;
+    font-weight: 700;
+    border: none;
+    color: var(--color-bg);
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+

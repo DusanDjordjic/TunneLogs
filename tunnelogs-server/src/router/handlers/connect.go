@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"time"
 	"tunnelogs-server/logger"
 
 	"github.com/gorilla/websocket"
@@ -21,60 +22,107 @@ var (
 	lock    sync.Mutex
 )
 
+type MessageEvent int
+
+const (
+	ProducerDisconnected MessageEvent = 1
+)
+
 type Lobby struct {
 	name     string
-	client   *websocket.Conn
+	clients  []*websocket.Conn
 	producer *websocket.Conn
 	started  bool
+	lock     sync.Mutex
+}
+
+func newLobby(name string) *Lobby {
+	return &Lobby{
+		name:     name,
+		clients:  make([]*websocket.Conn, 0),
+		producer: nil,
+		started:  false,
+		lock:     sync.Mutex{},
+	}
 }
 
 func (lobby *Lobby) isReady() bool {
-	return lobby.client != nil && lobby.producer != nil
+	lobby.lock.Lock()
+	defer lobby.lock.Unlock()
+
+	return len(lobby.clients) > 0 && lobby.producer != nil
+}
+
+func (lobby *Lobby) addProducer(newProducer *websocket.Conn) {
+	lobby.lock.Lock()
+	defer lobby.lock.Unlock()
+
+	if lobby.producer != nil {
+		lobby.producer.WriteMessage(websocket.CloseMessage, nil)
+		lobby.producer.Close()
+	}
+
+	lobby.producer = newProducer
+}
+
+func (lobby *Lobby) addClient(newClient *websocket.Conn) {
+	lobby.lock.Lock()
+	defer lobby.lock.Unlock()
+	lobby.clients = append(lobby.clients, newClient)
 }
 
 const BYE_MESSAGE = "bye"
 
 func (lobby *Lobby) Start() {
+	lobby.lock.Lock()
 	if lobby.started {
+		lobby.lock.Unlock()
 		return
 	}
+
+	lobby.started = true
+	lobby.lock.Unlock()
+
 	log := logger.Log.Named(fmt.Sprintf("[Lobby::%s]", lobby.name))
 
 	for {
-		messageType, message, err := lobby.producer.ReadMessage()
-		if err != nil {
-			// TODO do better error checking
-			log.Error("failed to read message from producer", zap.Error(err))
-			log.Info("sending bye to client")
-			err := lobby.client.WriteMessage(websocket.TextMessage, []byte(BYE_MESSAGE))
-			if err != nil {
-				log.Error("failed to send bye to client", zap.Error(err))
+		func() {
+			lobby.lock.Lock()
+			defer lobby.lock.Unlock()
+
+			if lobby.producer == nil {
+				time.Sleep(time.Second)
+				return
 			}
 
-			lobby.client.Close()
-			lobby.producer.Close()
-			break
-		}
-
-		err = lobby.client.WriteMessage(messageType, message)
-		if err != nil {
-			// TODO do better error checking
-			log.Error("failed to send message to client", zap.Error(err))
-			log.Info("sending bye to producer")
-			err := lobby.producer.WriteMessage(websocket.TextMessage, []byte(BYE_MESSAGE))
+			messageType, message, err := lobby.producer.ReadMessage()
 			if err != nil {
-				log.Error("failed to send bye to server", zap.Error(err))
+				log.Error("failed to read message from producer", zap.Error(err))
+				lobby.producer.WriteMessage(websocket.CloseMessage, nil)
+				lobby.producer.Close()
+				lobby.producer = nil
+				return
 			}
 
-			lobby.client.Close()
-			lobby.producer.Close()
-			break
-		}
+			log.Warn("sending message to clients", zap.Int("Clients", len(lobby.clients)))
+
+			removeClients := make([]int, 0)
+			for i, client := range lobby.clients {
+				err = client.WriteMessage(messageType, message)
+				if err != nil {
+					// TODO do better error checking
+					log.Error("failed to send message to client", zap.Error(err))
+					client.WriteMessage(websocket.CloseMessage, nil)
+					client.Close()
+					removeClients = append(removeClients, i)
+				}
+			}
+
+			for _, index := range removeClients {
+				lobby.clients = append(lobby.clients[:index], lobby.clients[index+1:]...)
+			}
+		}()
 	}
-
-	lock.Lock()
-	defer lock.Unlock()
-	delete(lobbies, lobby.name)
 }
 
 func ClientWSHandler(c echo.Context) error {
@@ -93,20 +141,8 @@ func ClientWSHandler(c echo.Context) error {
 
 	lobby, ok := lobbies[lobbyName]
 	if !ok {
-		lobby = &Lobby{
-			name:     lobbyName,
-			client:   nil,
-			producer: nil,
-			started:  false,
-		}
-
+		lobby = newLobby(lobbyName)
 		lobbies[lobbyName] = lobby
-	}
-
-	if lobby.client != nil {
-		// TODO support multiple clients
-		log.Error("client is already connected")
-		return errors.New("client is already connected")
 	}
 
 	conn, err := upgrader.Upgrade(c.Response().Writer, c.Request(), nil)
@@ -115,7 +151,8 @@ func ClientWSHandler(c echo.Context) error {
 		return err
 	}
 
-	lobby.client = conn
+	log.Info("Adding new client")
+	lobby.addClient(conn)
 
 	if lobby.isReady() {
 		log.Info("lobby is ready. startting...", zap.String("Name", lobbyName))
@@ -144,19 +181,8 @@ func ServerWSHandler(c echo.Context) error {
 
 	lobby, ok := lobbies[lobbyName]
 	if !ok {
-		lobby = &Lobby{
-			name:     lobbyName,
-			client:   nil,
-			producer: nil,
-			started:  false,
-		}
+		lobby = newLobby(lobbyName)
 		lobbies[lobbyName] = lobby
-	}
-
-	if lobby.producer != nil {
-		// we only want one producer
-		log.Error("producer is already connected")
-		return errors.New("producer is already connected")
 	}
 
 	conn, err := upgrader.Upgrade(c.Response().Writer, c.Request(), nil)
@@ -165,7 +191,8 @@ func ServerWSHandler(c echo.Context) error {
 		return err
 	}
 
-	lobby.producer = conn
+	log.Info("Adding New Producer")
+	lobby.addProducer(conn)
 
 	if lobby.isReady() {
 		log.Info("lobby is ready. startting...", zap.String("Name", lobbyName))

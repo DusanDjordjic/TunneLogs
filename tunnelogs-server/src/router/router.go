@@ -7,7 +7,8 @@ import (
 )
 
 func SetupRouter(server *echo.Echo) {
-	server.GET("/", handlers.PageHandler)
+	server.GET("/", handlers.HomePageHandler)
+	server.GET("/lobby/:name", handlers.LobbyPageHandler)
 	server.GET("/connect/:name/client", handlers.ClientWSHandler)
 	server.GET("/connect/:name/server", handlers.ServerWSHandler)
 }
